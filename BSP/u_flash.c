@@ -87,7 +87,7 @@ uint32_t factory=0;
 void Init_Dev_Param()
 {
 	
-	Flash_Read_Word( ADDR_FLASH_PAGE_511, (uint32_t *)factory,1) ;
+	Flash_Read_Word( ADDR_FLASH_PAGE_511, (uint32_t *)&factory,1) ;
 	Flash_Read_Word( ADDR_FLASH_PAGE_512, (uint32_t *)sn_code,3 ) ;
 	    while(factory!=1)
 			{

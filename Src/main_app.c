@@ -112,6 +112,8 @@ void lora_send_data(uint8_t *lora_data,uint8_t lora_datalen)
 	   SX127X_TxPacket(TXbuffer);
 	   communication_states = APP_IDLE;
 }
+
+extern uint8_t sn_code[12];
 //   uint8_t flag;
 void lora_process()
 {
@@ -153,47 +155,63 @@ void lora_process()
 				     SX127X_RxPacket(RXbuffer);		
 				     SX127X_StandbyMode();  //切换状态清空FIFO，要不收到250个字节，会出错
 			   //   SX127X_SleepMode(); //睡眠模式	
-						 for(uint16_t i=0;i<G_LoRaConfig.PayloadLength;i++)
-			 	 {
-					printf("RXbuffer[%d]=%02x\r\n",i,RXbuffer[i]);
-									
-				 }
+//						 for(uint16_t i=0;i<G_LoRaConfig.PayloadLength;i++)
+//			 	 {
+//					printf("RXbuffer[%d]=%02x\r\n",i,RXbuffer[i]);
+//									
+//				 }
 					/*******************解密**********************************************/
 						data_decrypt(G_LoRaConfig.PayloadLength,RXbuffer, RXbuffer);
 				/******************************************************************/
-             printf("网关收到来自与报警器的数据\r\n");				
-				 for(uint16_t i=0;i<G_LoRaConfig.PayloadLength;i++)
-			 	 {
-					printf("RXbuffer[%d]=%02x\r\n",i,RXbuffer[i]);
-									
-				 }
+//             printf("网关收到来自与报警器的数据\r\n");				
+//				 for(uint16_t i=0;i<G_LoRaConfig.PayloadLength;i++)
+//			 	 {
+//					printf("RXbuffer[%d]=%02x\r\n",i,RXbuffer[i]);
+//									
+//				 }
+       //   send_string_to_eth(RXbuffer,G_LoRaConfig.PayloadLength);
 				 //添加productkey
 				 for(uint8_t i=0;i<8;i++)
 				 {
 					 ether_st.RX_pData[i]=product_key[i];
 				 }
+		//添加sn码
+				 	 for(uint8_t i=0;i<12;i++)
+				 {
+					 ether_st.RX_pData[i+8]=RXbuffer[i];
+				 }
 				 //添加包头
 				
-					 ether_st.RX_pData[8]=0xfe;
-					 ether_st.RX_pData[9]=0xef;
-				 //
-				 for(uint8_t i=0;i<G_LoRaConfig.PayloadLength-2;i++)
+					 ether_st.RX_pData[8+12]=0xfe;  //+12添加SN码//20
+					 ether_st.RX_pData[9+12]=0xef;  //+12//21
+				 //设备号
+				 for(uint8_t i=0;i<G_LoRaConfig.PayloadLength-2-12;i++)//19-12-2
 			 	 {
-				 	ether_st.RX_pData[i+10]=RXbuffer[i+2];//去掉0x5a ,a5包头
+				 	ether_st.RX_pData[i+10+12]=RXbuffer[i+2+12];//去掉0x5a ,a5包头+sncode+12
 									
-				 }
+				 }//5
+				 //
 //				 printf("G_LoRaConfig.PayloadLength=%d\r\n",G_LoRaConfig.PayloadLength); 
 				 //包尾
-				  ether_st.RX_pData[10+G_LoRaConfig.PayloadLength-2]=0xef;
+				  ether_st.RX_pData[10+G_LoRaConfig.PayloadLength-2]=0xef;  //8+12+17=
 				  ether_st.RX_pData[11+G_LoRaConfig.PayloadLength-2]=0xfe;
 				 
-				   send_eth_len=G_LoRaConfig.PayloadLength+10;
+				   send_eth_len=G_LoRaConfig.PayloadLength+10;//+12 是sn
 //				    for(uint16_t i=0;i<send_eth_len;i++)
 //				 {
 //					 printf("ether_st.RX_pData[%d]=%02x\r\n",i,ether_st.RX_pData[i]);
 //					 
 //					 
 //				 }
+				//   send_string_to_eth(RXbuffer,G_LoRaConfig.PayloadLength);
+				  	 for(uint8_t i=0;i<G_LoRaConfig.PayloadLength-12;i++)
+				 {
+					   RXbuffer[i]=RXbuffer[i+12];
+				 }
+				 
+		   
+				 
+			//	 send_string_to_eth(RXbuffer,G_LoRaConfig.PayloadLength-12);
 				 //接收数据处理和网关入网  重要说明 RXbuffer[1]=a5是网关lora发出，过滤掉多个网关3
 				   if((RXbuffer[0]==0x5a&&RXbuffer[1]!=0xa5&&RXbuffer[4]==0x01))
 					 {   
@@ -204,7 +222,8 @@ void lora_process()
 								 //接收到设备入网求，通过wifi转发到后台
 								 case  0x01 :
 									 printf("设备入网请求收到,转发到Web\r\n");
-									   send_string_to_eth(ether_st.RX_pData,send_eth_len); break;
+									   send_string_to_eth(ether_st.RX_pData,send_eth_len); 
+								  break;
 								 //设备入网状态，转发到后台
 								 case  0x02 : 
                     printf("设备入网状态收到,转发到Web\r\n");									 
@@ -299,7 +318,7 @@ uint8_t pin_pack(uint8_t *dev,uint8_t dev_type,uint8_t function_num,uint8_t *dat
 //	}
 //	  return index;
 //}
-
+extern uint8_t sn_code[12];
 uint8_t wifi_connect_pin_pack(uint8_t *dev,uint8_t dev_type,uint8_t function_num,uint8_t *data_pack,uint8_t data_pack_len,uint8_t *proctukey)
 {
 	    uint16_t index=0;
@@ -307,6 +326,10 @@ uint8_t wifi_connect_pin_pack(uint8_t *dev,uint8_t dev_type,uint8_t function_num
 	     for(uint16_t i=0;i<8;i++)
 	{
 	  wifiTXbuffer[index++]=proctukey[i]; //productkey
+	}
+		     for(uint16_t i=0;i<12;i++)
+	{
+	  wifiTXbuffer[index++]=sn_code[i]; //productkey
 	}
 	  wifiTXbuffer[index++]=Manufacturer_ID_1;
 	  wifiTXbuffer[index++]=Manufacturer_ID_2;
@@ -492,39 +515,17 @@ void wifi_process()
 						 }
 				       if(ether_st.RX_flag==1)
 							    {									
-//											 //如果收到888，重新设置设备参数
-//								    if((ether_st.RX_pData[0]==8)&&(ether_st.RX_pData[1]==8)&&(ether_st.RX_pData[2]==8))
-//										{
-//											
-//											
-//											                 	chuchang_flag=1; //设置成功
-//														         STMFLASH_Write (  0x800f510, (uint32_t* )&chuchang_flag, 1)	;
-//											          HAL_Delay(100);
-//											               STMFLASH_Read (  0x800f510, (uint32_t* )&chuchang_flag, 1)	;
-//											           HAL_Delay(100);
-//											      send_string_to_eth( (uint8_t *)&chuchang_flag,1);
-//																	 	    factory_parameter_flag=0;//重新分配设备地址
-//								            STMFLASH_Write (  0x800f400, (uint32_t* )&factory_parameter_flag, 1);
-//																						          HAL_Delay(100);
-//											               STMFLASH_Read (  0x800f400, (uint32_t* )&factory_parameter_flag, 1)	;
-//											 send_string_to_eth( (uint8_t *)&factory_parameter_flag,1);
-//				                      wifi_connect_pin_pack(dev_num,0x02,0x05,&data_wifi_pa,1,product_key);
-//												 send_string_to_eth(ether_st.RX_pData,3);		
-//																	        HAL_Delay(100);
-//														             HAL_NVIC_SystemReset(); //复位重启 
-//											
-//											
-//										}
-										 	for(uint8_t i=0;i<ether_st.RX_Size-8;i++)
+
+										 	for(uint8_t i=0;i<ether_st.RX_Size-20;i++)
 									{
 										
-										ether_st.RX_pData[i]=ether_st.RX_pData[i+8];
+										ether_st.RX_pData[i]=ether_st.RX_pData[i+20];   //fe ef ...数据  把产品ductkey去掉和sn   8+12=20
 //											 printf("ether_st.RX_pData[%d]=%02x",i,ether_st.RX_pData[i]);
 									}
 									//第一次收到数据，发生数据错位，前面第一个位置是00 
-								send_string_to_eth(ether_st.RX_pData,ether_st.RX_Size-8);
+								send_string_to_eth(ether_st.RX_pData,ether_st.RX_Size-20);
 								 //网关的信息
-								     if(ether_st.RX_pData[4]==0x02)
+								     if(ether_st.RX_pData[4]==0x02)  //fe ef 01 02 05 01
 									   {
 										     switch(ether_st.RX_pData[5])
 												 {												
@@ -550,7 +551,7 @@ void wifi_process()
 //								  //把设备号写进去
 //								 		           	 u8_ip_to_u32_ip(dev_num,u32_dev_num);
 //                             STMFLASH_Write (0x800f488, (uint32_t* )u32_dev_num, 1)	; 		
-                                eth_ack_flag=0;
+                                  eth_ack_flag=0;
 													         wifi_comum=4;
 								               
 							                   }
@@ -620,11 +621,11 @@ void wifi_process()
 								   
 								 			
 
-					       //去掉prodcut和包头，包尾
-										for(uint8_t i=0;i<ether_st.RX_Size-12;i++)
+					       //去掉prodcut和包头，包尾+sncode
+										for(uint8_t i=0;i<ether_st.RX_Size-12-12;i++)//8+12+2+2
 									{
 										
-										   ether_st.RX_pData[i]=ether_st.RX_pData[i+10];//从设备号开启存放
+										   ether_st.RX_pData[i]=ether_st.RX_pData[i+10+12];//从设备号开启存放  8+12+2  
 									}
 									
 								 //网关的信息
@@ -632,92 +633,15 @@ void wifi_process()
 									 {
 										 
 										   printf("收到网关消息\r\n");
-//										     switch(ether_st.RX_pData[3])
-//												 {												
-//													  case 0x01 :  
-//														      
-//														   dev_num[0]=ether_st.RX_pData[4]; 
-//													     dev_num[1]=ether_st.RX_pData[5];
-////													    EEPROM_WriteBytes(dev_num, 10, 2);
-//														    printf(" dev_num[0]=%d", dev_num[0]);
-//														   printf(" dev_num[1]=%d", dev_num[1]);
-//												             data_wifi_pa=1;
-//				                 printf("wifilen=%d\r\n",wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1));
-//			          for(uint8_t i=0;i<wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1);i++)
-//			           {
-//									 
-//								   printf("	 wifiTXbuffer[i]=%02x",wifiTXbuffer[i]);
-//								 }
-
-//													         break;
-//														case 0x02 :  
-
-//														     if(ether_st.RX_pData[4]==1)
-//																 {
-//																	 
-//																	       wifi_comum=3;
-//																 }
-//													        break;
-																 //设置本机IP地址
-//														case 0x03 :
-//															printf("设置IP地址\r\n");
-//															     memset(local_eth_ip, 0, sizeof(local_eth_ip));	
-//																	  for(uint8_t i=0;i<4;i++)
-//																	 {
-//																		  
-//																		 local_eth_ip[i]= ether_st.RX_pData[4+i];
-//																	 }
-//																	 u8_ip_to_u32_ip(local_eth_ip,u32_local_eth_ip);
-//                             STMFLASH_Write (  0x800f428, (uint32_t* )u32_local_eth_ip, 1)	; //写本机地址																	 
-//																      data_wifi_pa=1;
-//				                      wifi_connect_pin_pack(dev_num,0x02,0x03,&data_wifi_pa,1,product_key);
-//												 send_string_to_eth(wifiTXbuffer,wifi_connect_pin_pack(dev_num,0x02,0x03,&data_wifi_pa,1,product_key));				
-//														break;
-//																	 //设置远程IP地址
-//													case 0x04 :
-//																printf("设置远程IP地址\r\n");
-//															     memset(Remote_eth_ip, 0, sizeof(Remote_eth_ip));	
-//																	  for(uint8_t i=0;i<4;i++)
-//																	 {
-//																		  
-//																		 Remote_eth_ip[i]= ether_st.RX_pData[4+i];
-//																	 }
-//																	 u8_ip_to_u32_ip(Remote_eth_ip,u32_Remote_eth_ip);
-//                             STMFLASH_Write (  0x800f448, (uint32_t* )u32_Remote_eth_ip, 1)	; //写远程IP地址																	 
-//                                        		      data_wifi_pa=1;
-//				                      wifi_connect_pin_pack(dev_num,0x02,0x04,&data_wifi_pa,1,product_key);
-//												 send_string_to_eth(wifiTXbuffer,wifi_connect_pin_pack(dev_num,0x02,0x04,&data_wifi_pa,1,product_key));		
-//														break;
-//																	 //设置远程端口
-//					                	case 0x05 :
-//																printf("设置远程IP端口\r\n");
-//															     memset(Remote_eth_port, 0, sizeof(Remote_eth_port));	
-//																	  for(uint8_t i=0;i<4;i++)
-//																	 {
-//																		  
-//																		 Remote_eth_port[i]= ether_st.RX_pData[4+i];
-//																	 }
-//																	 u8_ip_to_u32_ip(Remote_eth_port,u32_Remote_eth_port);
-//                             STMFLASH_Write (  0x800f468, (uint32_t* )u32_Remote_eth_port, 1)	; //写远程端口地址																	 
-//														                       	chuchang_flag=3; //设置成功
-//														         STMFLASH_Write (  0x800f510, (uint32_t* )&chuchang_flag, 1)	;
-//																	 		      data_wifi_pa=1;
-//				                      wifi_connect_pin_pack(dev_num,0x02,0x05,&data_wifi_pa,1,product_key);
-//												 send_string_to_eth(wifiTXbuffer,wifi_connect_pin_pack(dev_num,0x02,0x05,&data_wifi_pa,1,product_key));		
-//																	        HAL_Delay(100);
-//														             HAL_NVIC_SystemReset(); //复位重启
-//														break;
-//															 
-//																							
-//												}										 
-									}
+						 
+									 }
 									 //lora数据
-										else if(ether_st.RX_pData[2]==0x01)  //00 00 01 01 01
+									 else if(ether_st.RX_pData[2]==0x01)  //00 00 01 01 01
 											{
 												       printf("收到lora消息\r\n");
 												        ether_st.tem_RX_pData[0]=0x5a;
 														    ether_st.tem_RX_pData[1]=0xa5;
-												    ether_st.RX_Size=ether_st.RX_Size-8-2;
+												    ether_st.RX_Size=ether_st.RX_Size-8-12-2;//sncode 8+12+2 
 												   switch(ether_st.RX_pData[3])
 													 {	 
 														 case 0x01 :
@@ -902,7 +826,7 @@ void wifi_process()
 							 break;
 								 //网关入网状态发送
             case 4 :
-									    data_wifi_pa=1;
+									       data_wifi_pa=1;
 				              wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1,product_key);
 												 send_string_to_eth(wifiTXbuffer,   wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1,product_key));	
 			                   wifi_comum=20;  
@@ -939,12 +863,12 @@ void wifi_process()
 											
 											
 										}
-										 	for(uint8_t i=0;i<ether_st.RX_Size-8;i++)
+										 	for(uint8_t i=0;i<ether_st.RX_Size-20;i++)
 									{
 										
-										ether_st.tem_RX_pData[i]=ether_st.RX_pData[i+8];
+										ether_st.tem_RX_pData[i]=ether_st.RX_pData[i+20];
 									}
-											 	for(uint8_t i=0;i<ether_st.RX_Size-8;i++)
+											 	for(uint8_t i=0;i<ether_st.RX_Size-20;i++)
 									{
 										
 										ether_st.RX_pData[i]=ether_st.tem_RX_pData[i];
