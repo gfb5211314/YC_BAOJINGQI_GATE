@@ -6,6 +6,9 @@
 #include "string.h"
 #include "ether_hal.h"
 #include "stm_flash.h"
+
+
+#include <stdlib.h>
 //业务层
 
 #define   Manufacturer_ID_1        0xfe
@@ -54,7 +57,11 @@ extern uint8_t  Remote_eth_port[30];
 extern uint32_t  u32_local_eth_ip[1];
 extern uint32_t  u32_Remote_eth_ip[1];
 extern uint32_t  u32_Remote_eth_port[1];
+
+
 uint8_t product_key[30]={0,0,0,0,0,0,0,1};//一定要初始化，要不写读会发生问题
+uint8_t baojingqi_product_key[30]={0,0,0,0,0,0,0,1};//一定要初始化，要不写读会发生问题
+
 extern uint32_t u32_product_key[2];
 extern uint32_t  u32_dev_num[1]; 
 void set_txrx_datalen(uint8_t datalen);
@@ -66,6 +73,18 @@ uint8_t pin_pack(uint8_t *dev,uint8_t dev_type,uint8_t function_num,uint8_t *dat
 void u8_ip_to_u32_ip_more(uint8_t *ipbuf,uint32_t *ipuf,uint16_t u8_len);
 void u8_ip_to_u32_ip(uint8_t *ipbuf,uint32_t *ipuf);
 void u32_ip_to_u8_ip(uint8_t *ipbuf,uint32_t *ipuf,uint16_t u32_len);
+
+
+
+#define  LORA_GATE_PRODUCTY             "gS7P5ubq"
+#define  LORA_BAOJINGQI_PRODUCTY        "LBJ32RWK"
+
+void Param_Init()
+{
+		 memcpy(product_key, LORA_GATE_PRODUCTY,   sizeof(LORA_GATE_PRODUCTY) );
+	  memcpy(baojingqi_product_key, LORA_BAOJINGQI_PRODUCTY,   sizeof(LORA_BAOJINGQI_PRODUCTY) );
+	
+}
 enum DemoInternalStates
 {
     APP_RNG = 0, // nothing to do (or wait a radio interrupt)
@@ -102,8 +121,12 @@ void app_lora_config_init()
 		  	SX127X_StartRx();
 		  communication_states=APP_IDLE;
 }
+uint32_t rand_data=0;
 void lora_send_data(uint8_t *lora_data,uint8_t lora_datalen)
 {
+	       rand_data=rand()%40+1;
+	      rand_data=rand_data*100;
+	      HAL_Delay(rand_data);
 	      SX127X_StandbyMode();    
      set_txrx_datalen(lora_datalen);
 	/***********************加密*************************/
@@ -132,19 +155,21 @@ void lora_process()
         if(flag & RFLR_IRQFLAGS_TXDONE)
         {
             communication_states = TX_DONE;
-					  printf("send sucess\r\n");
+					//  printf("send sucess\r\n");
+				//	  send_string_to_eth((uint8_t*)"txsucees",8);
         }
         else if(flag & RFLR_IRQFLAGS_RXDONE)
         {
 				
             communication_states = RX_DONE;
-					printf("rx sucess\r\n");
+				//	printf("rx sucess\r\n");
+				//	 send_string_to_eth((uint8_t*)"rxsuceess",8);
         }
        }     
             break;
 
         case TX_DONE:
-          SX127X_StandbyMode();   //待机模式   打开接收模式
+      //    SX127X_StandbyMode();   //待机模式   打开接收模式
               SX127X_StartRx();
             communication_states = APP_IDLE;
             break;
@@ -153,7 +178,7 @@ void lora_process()
 					 SX127X_Read(REG_LR_NBRXBYTES, &G_LoRaConfig.PayloadLength); //获取数据长度
 //					 set_txrx_datalen(G_LoRaConfig.PayloadLength);
 				     SX127X_RxPacket(RXbuffer);		
-				     SX127X_StandbyMode();  //切换状态清空FIFO，要不收到250个字节，会出错
+				   //  SX127X_StandbyMode();  //切换状态清空FIFO，要不收到250个字节，会出错
 			   //   SX127X_SleepMode(); //睡眠模式	
 //						 for(uint16_t i=0;i<G_LoRaConfig.PayloadLength;i++)
 //			 	 {
@@ -173,7 +198,7 @@ void lora_process()
 				 //添加productkey
 				 for(uint8_t i=0;i<8;i++)
 				 {
-					 ether_st.RX_pData[i]=product_key[i];
+					 ether_st.RX_pData[i]=baojingqi_product_key[i];
 				 }
 		//添加sn码
 				 	 for(uint8_t i=0;i<12;i++)
@@ -222,8 +247,7 @@ void lora_process()
 								 //接收到设备入网求，通过wifi转发到后台
 								 case  0x01 :
 									 printf("设备入网请求收到,转发到Web\r\n");
-									   send_string_to_eth(ether_st.RX_pData,send_eth_len); 
-								  break;
+									   send_string_to_eth(ether_st.RX_pData,send_eth_len);  break;
 								 //设备入网状态，转发到后台
 								 case  0x02 : 
                     printf("设备入网状态收到,转发到Web\r\n");									 
@@ -463,11 +487,11 @@ void wifi_process()
 //   																STMFLASH_Read (  0x800f500, (uint32_t* )u32_product_key, 2)	; //读
                                	u32_ip_to_u8_ip(product_key,u32_product_key,2);
 																		
-                for(uint8_t i=0;i<8;i++)
-         	{
-		           printf("%c",product_key[i]);
+                                        for(uint8_t i=0;i<8;i++)
+                                     	{
+		                                 printf("%c",product_key[i]);
 		
-	          }			
+	                                    }			
 																	 		      data_wifi_pa=1;
 				                      wifi_connect_pin_pack(dev_num,0x02,0x06,&data_wifi_pa,1,product_key);
 												 send_string_to_eth(wifiTXbuffer,wifi_connect_pin_pack(dev_num,0x02,0x06,&data_wifi_pa,1,product_key));		
@@ -589,7 +613,7 @@ void wifi_process()
 						   	 printf("发送心跳\r\n");
 			                 data_wifi_pa=1;
 				         wifi_connect_pin_pack(dev_num,0x02,0x08,&data_wifi_pa,1,product_key);
-												 send_string_to_eth(wifiTXbuffer,wifi_connect_pin_pack(dev_num,0x02,0x08,&data_wifi_pa,1,product_key));	
+								 send_string_to_eth(wifiTXbuffer,wifi_connect_pin_pack(dev_num,0x02,0x08,&data_wifi_pa,1,product_key));	
 							   xintiao_flag=0;							
 						  }
 			 //业务处理
@@ -652,10 +676,10 @@ void wifi_process()
 																				 ether_st.tem_RX_pData[i+2]=ether_st.RX_pData[i];
 																																				
 																			 }
-                                      for(uint8_t i=0;i<ether_st.RX_Size;i++)
-                                       {
-	                           printf(" ESP8266.tem_RX_pData[%d]=%02x",i,ether_st.tem_RX_pData[i]);
-																			 }
+//                                      for(uint8_t i=0;i<ether_st.RX_Size;i++)
+//                                       {
+//	                                 printf(" ESP8266.tem_RX_pData[%d]=%02x",i,ether_st.tem_RX_pData[i]);
+//																			 }
                                        lora_send_data(ether_st.tem_RX_pData,ether_st.RX_Size);   
 														 break;
 																			  case 0x02 :
@@ -667,10 +691,10 @@ void wifi_process()
 																	
 																				
 																			 }
-                                      for(uint8_t i=0;i<ether_st.RX_Size;i++)
-                                       {
-	                           printf(" ESP8266.tem_RX_pData[%d]=%02x",i,ether_st.tem_RX_pData[i]);
-																			 }
+//                                      for(uint8_t i=0;i<ether_st.RX_Size;i++)
+//                                       {
+//	                           printf(" ESP8266.tem_RX_pData[%d]=%02x",i,ether_st.tem_RX_pData[i]);
+//																			 }
                                        lora_send_data(ether_st.tem_RX_pData,ether_st.RX_Size);   
 														 break;
 														 //lora 上传电量信息 ，WIFI转发
@@ -683,10 +707,10 @@ void wifi_process()
 																	
 																				
 																			 }
-                                      for(uint8_t i=0;i<ether_st.RX_Size;i++)
-                                       {
-	                           printf(" ESP8266.tem_RX_pData[%d]=%02x",i,ether_st.tem_RX_pData[i]);
-																			 }
+//                                      for(uint8_t i=0;i<ether_st.RX_Size;i++)
+//                                       {
+//	                           printf(" ESP8266.tem_RX_pData[%d]=%02x",i,ether_st.tem_RX_pData[i]);
+//																			 }
                                        lora_send_data(ether_st.tem_RX_pData,ether_st.RX_Size);     
 														   break;
 																			 	 //lora 防拆应答 ，WIFI转发
@@ -889,12 +913,12 @@ void wifi_process()
 														    printf(" dev_num[0]=%d", dev_num[0]);
 														    printf(" dev_num[1]=%d", dev_num[1]);
 												             data_wifi_pa=1;
-				                 printf("wifilen=%d\r\n",wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1,product_key));
-			       for(uint8_t i=0;i<wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1,product_key);i++)
-			           {
-									 
-								   printf("	 wifiTXbuffer[i]=%02x",wifiTXbuffer[i]);
-								 }
+//				                 printf("wifilen=%d\r\n",wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1,product_key));
+//			       for(uint8_t i=0;i<wifi_connect_pin_pack(dev_num,0x02,0x02,&data_wifi_pa,1,product_key);i++)
+//			           {
+//									 
+//								   printf("	 wifiTXbuffer[i]=%02x",wifiTXbuffer[i]);
+//								 }
 							        	 factory_parameter_flag=3;
 //								   STMFLASH_Write (  0x800f400, (uint32_t* )&factory_parameter_flag, 1);
 //								  //把设备号写进去

@@ -48,7 +48,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-#define  BAOJINGQI_GATE_WAY_VERSION       "BJQ_GAYE_WAY_V1.00"
+#define  BAOJINGQI_GATE_WAY_VERSION       "BJQ_GAYE_WAY_V1.01"
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
@@ -202,6 +202,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 //FLASH_If_Init();
 	chuchang_check();
+	 Param_Init();
 //	printf("123\r\n");
 //	   
 //			printf("tep_chuchang_flag=%d",tep_chuchang_flag);
@@ -213,14 +214,15 @@ int main(void)
 //reset_ethdevinit();
    app_lora_config_init();
    ETH_Rst();
-  ETH_DMA_START();
-	   Init_Dev_Param(); //设备SN码和 退出工厂模式
+   ETH_DMA_START();
+	 Init_Dev_Param(); //设备SN码和 退出工厂模式
 //   eth_at_open(); //设置进入AT模式
 // 	 while(eth_init()!=1);//设置模组参数
 //	  /* IWDG 1s 超时溢出 */ 
-//  MX_IWDG_Init(IWDG_PRESCALER_64,625);
+    MX_IWDG_Init();
+	HAL_IWDG_Refresh(&hiwdg);
   /* 启动独立看门狗 */
-//  HAL_IWDG_Start(&hiwdg); 
+ // HAL_IWDG_Start(&hiwdg); 
   /* USER CODE END 2 */
    
   /* Infinite loop */

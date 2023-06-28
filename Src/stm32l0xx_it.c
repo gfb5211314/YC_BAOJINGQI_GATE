@@ -65,6 +65,10 @@ extern uint32_t xintiao_flag;
  uint32_t system_count=0;
 extern uint8_t eth_ack_flag;
  uint32_t eth_ack_count=0;
+ 
+ //Ëæ»ú
+ uint32_t rand_tick_count=0;
+ uint32_t rand_num_count=0;
 /* USER CODE END EV */
 
 /******************************************************************************/
@@ -165,6 +169,13 @@ void SysTick_Handler(void)
 		eth_ack_count=0;
 		
 	}
+	rand_tick_count++;
+	 if(rand_tick_count>300)
+	 {
+		 HAL_IWDG_Refresh(&hiwdg);
+		 rand_tick_count=0;
+		 rand_num_count++;		 
+	 }
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
   /* USER CODE BEGIN SysTick_IRQn 1 */
